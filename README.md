@@ -1,4 +1,4 @@
-# My R scrapheap
+# [My R scrapheap](https://hcliedtke.github.io/R-scrapheap/)
 
 Here are bits of code that I have found use for more than once, and thought others might too.
 
@@ -8,7 +8,7 @@ Here are bits of code that I have found use for more than once, and thought othe
 
 
 
-#### Access all code though this [github pages](https://hcliedtke.github.io/R-scrapheap/):
+### Access all code though this [github pages](https://hcliedtke.github.io/R-scrapheap/)
 
  
  
