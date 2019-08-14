@@ -1,0 +1,90 @@
+---
+title: "Be Ultrametric, damnit!"
+author: "Christoph Liedtke"
+date: "14/08/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Be ultrametric, damnit!
+
+I ran into this problem vairous times when downloading a time-calibrated phylogeny off a repository and expecting it to be ultrametric. *ape's* `is.ultrametric()` kicks back a `FALSE` and for some downstream analyses, functions won't accept it. This drove me crazy because the trees look pretty damn ultrametric. It took me a while to figure out that either just one or two terminal branches are protruding a tiny, tiny bit, or that the distance from root to tip vaires between tips by the tiniest decimal.  
+
+My solution to this problem was to just clip/truncate or elongate the terminal branches so that the root-to-tip distance is the same for all tips.  
+
+This works pretty well for me and only needs the *ape* and *adephylo* package.  
+
+Here is an example:
+
+#### Make a random ultrametric tree, and then break it (for demonstrative purposes)
+```{r }
+library(ape)
+library(adephylo)
+
+
+## make a random ultrametric tree
+tree<-rcoal(50)
+par(mfrow=c(1,2))
+plot(tree, show.tip.label = F, main="random ultrametric tree")
+
+## lets change some branch lengths by a tiny amount that you can't even see:
+tree$edge.length[50:53]<-tree$edge.length[50:53]+0.0095
+tree$edge.length[60:62]<-tree$edge.length[60:62]-0.0002
+plot(tree, show.tip.label = F, main="non-ultrametric tree")
+is.ultrametric(tree)
+```
+
+
+#### Make it ultrametric 
+```{r}
+### get the distance from the root to each tip
+tip.heights<-distRoot(tree)
+
+
+### see which is the most common tip height and how much to adjust tips to all be the same
+(heights.summary<-table(round(tip.heights,5)))
+
+real.tree.height<-as.numeric(names(which.max(heights.summary)))
+over.under<-tip.heights-real.tree.height
+
+
+## extract all terminal edges for tips that do not have the final height we want:
+tip.ids <- tree$edge[, 2] <= Ntip(tree)
+terminal.edges <- tree$edge.length[tip.ids]
+
+
+## add/subtract the extra length from the terminal branches
+corrected.terminal.edges<-terminal.edges-over.under
+
+## change the termnial edges in the phylo object
+tree$edge.length[tip.ids]<-corrected.terminal.edges
+
+```
+
+#### Final test
+
+```{r}
+plot(tree, show.tip.label = F, main="its ultrametric!!")
+is.ultrametric(tree)
+
+````
+#### Make it a function!
+
+For convenience, we can now just throw it all together into a function and apply it to any tree we like.
+```{r}
+be.ultrametric<-function(phy) {
+  
+  tip.heights<-distRoot(tree)
+  heights.summary<-table(round(tip.heights,5))
+  real.tree.height<-as.numeric(names(which.max(heights.summary)))
+  over.under<-tip.heights-real.tree.height
+  tip.ids <- tree$edge[, 2] <= Ntip(tree)
+  terminal.edges <- tree$edge.length[tip.ids]
+  corrected.terminal.edges<-terminal.edges-over.under
+  tree$edge.length[tip.ids]<-corrected.terminal.edges
+  
+}
+```

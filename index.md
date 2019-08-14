@@ -13,7 +13,7 @@ Who knows... maybe they are useful for other people too!
  
 ## Phylogenetics and Systematics
 
-* Sometimes ultrametric trees aren't really ultrametric for something as trivial as branch lengths having different decimal places. Here is a quick fix.. [Be ultrametric, damnit!!](./ultrametric.md).
+* Sometimes ultrametric trees aren't really ultrametric for something as trivial as branch lengths having different decimal places. Here is a quick fix.. [Be ultrametric, damnit!!](./be_ultrametric.html).
 
 * Check out [AmphiNom](https://github.com/hcliedtke/AmphiNom), an R package for working with the Amphibian Species of the World database for amphibian systematics
 
