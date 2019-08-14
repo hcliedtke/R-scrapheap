@@ -2,7 +2,7 @@
 
 Here are bits of code that I have found use for more than once, and thought others might too.
 
-### *that ugly chunk of code you comment out instead of delete:*
+#### *That ugly chunk of code you comment out instead of delete:*
 ![](steve_irwin.gif)
 
 
