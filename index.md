@@ -1,11 +1,11 @@
 ---
 layout: default
 ---
-# Welcome to my R scrapheap
+# Welcome to my R Scrapheap
 
-I use R on a daily basis and fairly regularly I run into a problem that I could have sworen I had faced before. After years of frantically searching through various script files, I have decided to compile (sometimes) useful bits of code that I might need again.
+I use R on a daily basis and fairly regularly I run into re-occuring problems. After years of frantically searching through various scripts to see how I solved it last time, I have decided to compile (sometimes) useful bits of code that I might need again.
 
-#### *That ugly chunk of code you comment out instead of delete:*
+##### *That ugly chunk of code you really should delete, but can't bring yourself to do it, so you 'comment' it out instead:*
 ![](steve_irwin.gif)
 
 Who knows... maybe they are useful for other people too!
