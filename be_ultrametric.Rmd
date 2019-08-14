@@ -70,21 +70,52 @@ tree$edge.length[tip.ids]<-corrected.terminal.edges
 plot(tree, show.tip.label = F, main="its ultrametric!!")
 is.ultrametric(tree)
 
-````
+```
+
 #### Make it a function!
 
 For convenience, we can now just throw it all together into a function and apply it to any tree we like.
 ```{r}
 be.ultrametric<-function(phy) {
   
-  tip.heights<-distRoot(tree)
+  tip.heights<-distRoot(phy)
   heights.summary<-table(round(tip.heights,5))
   real.tree.height<-as.numeric(names(which.max(heights.summary)))
   over.under<-tip.heights-real.tree.height
-  tip.ids <- tree$edge[, 2] <= Ntip(tree)
-  terminal.edges <- tree$edge.length[tip.ids]
+  tip.ids <- phy$edge[, 2] <= Ntip(phy)
+  terminal.edges <- phy$edge.length[tip.ids]
   corrected.terminal.edges<-terminal.edges-over.under
-  tree$edge.length[tip.ids]<-corrected.terminal.edges
+  phy$edge.length[tip.ids]<-corrected.terminal.edges
+  return(phy)
   
 }
 ```
+
+
+#### Worked example
+
+I ran into this problem when I tried to use amphibian trees from the [Pyron 2014](https://academic.oup.com/sysbio/article/63/5/779/2847944) paper.
+
+```{r}
+amph.tree<-read.tree("https://datadryad.org/bitstream/handle/10255/dryad.63062/amph_shl_dates_frogs.tre?sequence=1")
+
+# is it ultrametric?
+is.ultrametric(amph.tree)
+
+# strange... it looks pretty damn ultrametric
+plot(amph.tree, show.tip.label = F)
+
+# lets make it ultrametric then:
+amph.tree.corrected<-be.ultrametric(phy=amph.tree)
+
+# Boom! ultrametric!
+plot(amph.tree.corrected, show.tip.label = F)
+is.ultrametric(amph.tree.corrected)
+
+
+```
+
+#### Thoughts...
+
+For large trees this code is pretty slow. Most of the heavy-lifting is done by *adephylo*'s `distRoot()` function. I wonder if there is a better way to do this similar to the inner workings of *ape*'s `is.ultrametric()` function. Drop me a line by starting a [github isse](https://github.com/hcliedtke/R-scrapheap/issues) related to this repository.
+
