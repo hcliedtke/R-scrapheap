@@ -25,6 +25,7 @@ Here is an example:
 ```{r }
 library(ape)
 library(adephylo)
+library(phytools)
 
 
 ## make a random ultrametric tree
@@ -34,8 +35,8 @@ par(mfrow=c(1,2))
 plot(tree, show.tip.label = F, main="random ultrametric tree")
 
 ## lets change some branch lengths by a tiny amount that you can't even see:
-tree$edge.length[50:53]<-tree$edge.length[50:53]+0.0095
-tree$edge.length[60:62]<-tree$edge.length[60:62]-0.0002
+tree$edge.length[10:13]<-tree$edge.length[10:13]+0.0095
+tree$edge.length[29:31]<-tree$edge.length[29:31]-0.004
 plot(tree, show.tip.label = F, main="non-ultrametric tree")
 is.ultrametric(tree)
 ```
@@ -48,11 +49,15 @@ tip.heights<-distRoot(tree)
 
 
 ### see which is the most common tip height and how much to adjust tips to all be the same
-(heights.summary<-table(round(tip.heights,5)))
+(heights.summary<-table(tip.heights))
 
+options(digits=22) # set to maximum allowed digits
 real.tree.height<-as.numeric(names(which.max(heights.summary)))
 over.under<-tip.heights-real.tree.height
 
+## we can now paint the branches that were problematic using phytools()
+painted.tree<-paintBranches(tree,which(round(over.under,5)!=0),"2") # here I am rounding to 5 decimal places... pretty arbitrary choice
+plotSimmap(painted.tree,lwd=4)
 
 ## extract all terminal edges for tips that do not have the final height we want:
 tip.ids <- tree$edge[, 2] <= Ntip(tree)
@@ -77,20 +82,48 @@ is.ultrametric(tree)
 
 #### Make it a function!
 
-For convenience, we can now just throw it all together into a function and apply it to any tree we like.
+For convenience, we can now just throw it all together into a function and apply it to any tree we like. I have found that using `do.call()` on `distRoot()` shaves off a few precious seconds, and I have also included a *parallel* version using `mcapply()`, but how much faster this is (particularly on smaller trees) I have not yet tested extensively. 
 ```{r}
-be.ultrametric<-function(phy) {
+library(ape)
+library(adephylo)
+library(parallel)
+library(phytools)
+
+be.ultrametric<-function(phy, parallel=F, ncores=2, paint.tree=T) {
   
-  tip.heights<-distRoot(phy)
-  heights.summary<-table(round(tip.heights,5))
+  if(parallel){
+    
+    run.parallel<-function(phy,tips) do.call(distRoot, args=list(x=phy,tips=tips))
+    phy=phy
+    tips<-phy$tip.label
+    n.tips<-length(tips)
+    tip.heights<-mclapply(FUN=run.parallel,
+                          X=1:n.tips,
+                          phy=phy,
+                          mc.cores = ncores)
+    tip.heights<-unlist(tip.heights)
+  }
+  else {
+    tip.heights<-do.call(distRoot, args=list(x=phy,tips=phy$tip.label))
+  }
+  
+  heights.summary<-table(tip.heights)
+  options(digits=22)
   real.tree.height<-as.numeric(names(which.max(heights.summary)))
   over.under<-tip.heights-real.tree.height
   tip.ids <- phy$edge[, 2] <= Ntip(phy)
   terminal.edges <- phy$edge.length[tip.ids]
   corrected.terminal.edges<-terminal.edges-over.under
   phy$edge.length[tip.ids]<-corrected.terminal.edges
-  return(phy)
   
+  if(paint.tree){
+    paint.these<-which(round(over.under,6)!=0)
+    if(length(paint.these)>0){
+      phy<-paintBranches(phy,paint.these,"2")  
+    }
+  }
+  
+  return(phy)
 }
 ```
 
@@ -106,19 +139,31 @@ amph.tree<-read.tree("https://datadryad.org/bitstream/handle/10255/dryad.63062/a
 is.ultrametric(amph.tree)
 
 # strange... it looks pretty damn ultrametric
-plot(amph.tree, show.tip.label = F)
+plot.phylo(amph.tree, show.tip.label = F)
 
-# lets make it ultrametric then:
-amph.tree.corrected<-be.ultrametric(phy=amph.tree)
+# lets make it ultrametric then and test user times for running this in serial and parallel
+### serial
+start_time <- Sys.time()
+amph.tree.serial<-be.ultrametric(phy=amph.tree)
+end_time <- Sys.time()
+(serial.elapse.time<-end_time - start_time)
+
+### parallel with 8 cores
+start_time <- Sys.time()
+amph.tree.parallel<-be.ultrametric(phy=amph.tree, parallel=T, ncores=8)
+end_time <- Sys.time()
+(parallel.elapse.time<-end_time - start_time)
+
+### parallel version therefore runs a little faster!
 
 # Boom! ultrametric!
-plot(amph.tree.corrected, show.tip.label = F)
-is.ultrametric(amph.tree.corrected)
-
+plot.phylo(amph.tree.serial, show.tip.label = F)
+is.ultrametric(amph.tree.serial)
+is.ultrametric(amph.tree.parallel)
 
 ```
 
 #### Thoughts...
 
-For large trees this code is pretty slow. Most of the heavy-lifting is done by *adephylo*'s `distRoot()` function. I wonder if there is a better way to do this similar to the inner workings of *ape*'s `is.ultrametric()` function. Drop me a line by starting a [github issue](https://github.com/hcliedtke/R-scrapheap/issues) related to this repository.
+For large trees this code is still pretty slow even though I have tried to implement parallelization. Most of the heavy-lifting is done by *adephylo*'s `distRoot()` function. I wonder if there is a better way to do this similar to the inner workings of *ape*'s `is.ultrametric()` function. Drop me a line by starting a [github issue](https://github.com/hcliedtke/R-scrapheap/issues) related to this repository.
 
