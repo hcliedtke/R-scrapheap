@@ -241,7 +241,7 @@ We could now look at the individual distributions per node if we are interested 
 hist(as.numeric(node.sim["488",]), main="Simulated state for Salamander MRCA", xlab=NA, col="grey80", border=NA)
 ```
 
-Using the `ggtree` package, we could also plot these histograms directly on the nodes of the tree. To do this, I borrowed a bit of code from (here)[http://www.randigriffin.com/2017/05/11/primate-phylogeny-ggtree.html].
+Using the `ggtree` package, we could also plot these histograms directly on the nodes of the tree. To do this, I borrowed a bit of code from [here](http://www.randigriffin.com/2017/05/11/primate-phylogeny-ggtree.html).
 ```{r fig.height = 12, fig.width = 10, warning = F}
 library(ggtree)
 library(ggplot2)
