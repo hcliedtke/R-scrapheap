@@ -1,0 +1,272 @@
+---
+title: "Trait evolution using mvMORPH"
+author: "Christoph Liedtke"
+date: "August, 2019"
+output: 
+  html_document:
+    self_contained: true
+    toc: True # table of content true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    depth: 4  # upto three depths of headings (specified by #, ##, ### etc.)
+    theme: united  # many options for theme, this one is my favorite.
+    highlight: tango  # specifies the syntax highlighting style
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Intro
+
+Recently, we wanted to test whether a specific trait evolves under different evolutionary models for different subclades of a tree. In our case [genome size in amphibians](https://www.nature.com/articles/s41559-018-0674-4). To fit Brownian motion and Ornstein-Uhlenbeck models, we used Julien Clavel's [mvMORPH](https://github.com/JClavel/mvMORPH) R package.  
+
+Tree: pruned amphibian tree originally from [Pyron 2014](https://academic.oup.com/sysbio/article/63/5/779/2847944)  
+Data: genome sizes (c-values) for amphibian species from [Liedtke et al. 2018](https://www.nature.com/articles/s41559-018-0674-4)
+
+
+# Loading Data and Libraries
+```{r message=FALSE}
+library(mvMORPH)
+# install from CRAN or most recent release from github: https://github.com/JClavel/mvMORPH
+# make sure dependencies are installed too!
+
+```
+
+```{r}
+### load data:
+amphibia_cval<-read.csv("./data/amphibia_cval.csv", row.names = 1, sep=";")
+
+### load tree:
+amphibia.tree<-read.tree("./data/amphibia.tre")
+
+### match tree and data order
+amphibia_cval<-amphibia_cval[amphibia.tree$tip.label,]
+all(rownames(amphibia_cval)==amphibia.tree$tip.label)
+
+### log transform variable to be normally distributed
+amphibia_logC<-log10(amphibia_cval$median_c); names(amphibia_logC)<-rownames(amphibia_cval) # log10 transform data
+
+### plot phenogram to vizualize trait distribution
+phenogram(amphibia.tree, amphibia_logC, ftype = "off", ylab="genome size [log10(c-value)]")
+
+```
+
+# Setting up hypotheses
+
+By looking at the phylogenetic distribution of the data, it seemed like salamanders were off doing their own thing with really large genomes (that isolated clade, all with large genomes) we wanted to test whether a single trait model for the whole tree is really best in this case, or whether fitting a multiple optimum/parameters model would be more just. This way we could also test the hypothesis of whether each of the three amphibian orders (Frogs, Salamanders and Caecilians) have evolved under different sets of parameters.  
+
+To set up these hypotheses, we created a simmap object using (phytools)[http://blog.phytools.org/], a dependency of mvMORPH, 'painting' (i.e. annotating) subclades of the tree that we want to model different processes for.
+
+```{r}
+# make a colour scheme to use for vizualizing clades (in this case the three amphibian orders)
+cols<-c("black","deepskyblue3","chartreuse3","gold"); names(cols)<-c(1,"caudata","anura","gymno")
+
+# make a simmap object with two 'regimes', comparing salamanders to non-salamanders
+two_regimes_tree<-paintSubTree(amphibia.tree,
+                               node=getMRCA(amphibia.tree, rownames(amphibia_cval)[amphibia_cval$order=="Urodela"]),
+                               state="caudata",
+                               stem=T)
+plotSimmap(two_regimes_tree,cols,lwd=2,pts=F, ftype="off")
+
+# make a simmap object with three 'regimes' where each of the three amphibian orders is treated separately
+three_regimes_tree<-paintSubTree(amphibia.tree,
+                                 node=getMRCA(amphibia.tree, rownames(amphibia_cval)[amphibia_cval$order=="Gymnophiona"]),
+                                 state="gymno",
+                                 stem=T,
+                                 anc.state = "gymno")
+three_regimes_tree<-paintSubTree(three_regimes_tree,
+                                 node=getMRCA(amphibia.tree,rownames(amphibia_cval)[amphibia_cval$order=="Urodela"]),
+                                 state="caudata",
+                                 stem=T)
+three_regimes_tree<-paintSubTree(three_regimes_tree,
+                                 node=getMRCA(amphibia.tree,rownames(amphibia_cval)[amphibia_cval$order=="Anura"]),
+                                 state="anura",
+                                 stem=T)
+
+
+plotSimmap(three_regimes_tree,cols,lwd=2,pts=F, ftype="off")
+```
+
+# Fitting models
+
+With the clades of interest defined, we can now fit BM and OU models. **note: as of late, mvMORPH also allows fitting early burst and shift models too!**
+
+```{r}
+# single optimum/parameter set:
+fit_bm1<-mvBM(amphibia.tree, amphibia_logC,model="BM1",echo = F)
+fit_ou1<-mvOU(amphibia.tree, amphibia_logC,model="OU1",echo = F)
+
+
+# two optima/parameter sets:
+fit_bm2<-mvBM(two_regimes_tree,amphibia_logC,model="BMM", param=list(smean=F),echo = F)
+fit_ou2 <-mvOU(two_regimes_tree,amphibia_logC, model="OUM", param=list(root=F),echo = F)
+
+# three optima/parameter sets:
+fit_bm3<-mvBM(three_regimes_tree,amphibia_logC,model="BMM", param=list(smean=F),echo = T)
+fit_ou3 <-mvOU(three_regimes_tree,amphibia_logC, model="OUM", param=list(root=F),echo = F)
+
+
+```
+
+## Compare model fit
+
+Various things can be done here, for example we can calculate Akaike weights to compare models or we can perform likelihood ratio tests for each type of models (BM or OU)
+
+```{r warnings=F}
+## compare model fit using Akaike weights:
+results<-list(fit_bm1,fit_ou1, fit_bm2, fit_ou2,fit_bm3,fit_ou3)
+results<-aicw(results, aicc=TRUE)
+results # note, the model names used can be checked in each of the model fit objects.
+
+# Test significance with LRT
+LRT(fit_bm1, fit_bm2)
+LRT(fit_bm1, fit_bm3)
+LRT(fit_bm2,fit_bm3) 
+
+LRT(fit_ou1, fit_ou2)
+LRT(fit_ou1, fit_ou3) 
+LRT(fit_ou2,fit_ou3)
+```
+
+The AIC comparison suggests that the best model was a Brownian motion model with multiple sets of parameters, one for salamanders and one for everything else ('BMM default 3 model' in the Akeike weights table), but the likelihood ratio test was less clear about this, suggesting that that the 2 and 3 parameter sets performed equally well (or at least not significantly better or worse).  
+
+# Ancestral state reconstruction
+
+Seeing as the 2 and 3 parameter sets performed best, we are going to reconstruct ancestral states with these. Although BM outperformed OU, just as an example, I will reconstruct ancestral states with both.
+
+```{r}
+# BM (2 parameter model)
+bm2.asr.fit<-mvBM(two_regimes_tree,amphibia_logC,model="BMM", param=list(smean=F)) 
+bm2.asr.estim<-estim(two_regimes_tree, amphibia_logC, bm2.asr.fit, asr=TRUE)
+
+# BM (3 parameter model)
+bm3.asr.fit<-mvBM(three_regimes_tree,amphibia_logC,model="BMM", param=list(smean=F)) 
+bm3.asr.estim<-estim(three_regimes_tree, amphibia_logC, bm3.asr.fit, asr=TRUE)
+
+
+# OU (2 parameter model)
+ou2.asr.fit<-mvOU(two_regimes_tree,amphibia_logC,model="OUM", param=list(root=F)) 
+ou2.asr.estim<-estim(two_regimes_tree, amphibia_logC, ou2.asr.fit, asr=TRUE)
+
+# OU (3 parameter model)
+ou3.asr.fit<-mvOU(three_regimes_tree,amphibia_logC,model="OUM", param=list(root=F)) 
+ou3.asr.estim<-estim(three_regimes_tree, amphibia_logC, ou3.asr.fit, asr=TRUE)
+
+
+```
+
+We can now visualize these reconstructions using phenograms for example:
+
+```{r fig.height = 10, fig.width = 10}
+## BM
+#2 means
+bm2.asr.states<-10^c(amphibia_logC,bm2.asr.estim$estimates) # The key here is to paste the tip states together with the node states estimated by mvMORPH as one vector. Here I am converting log10() traits back to real space so that I can plot a y axis on a log scale. this is not necesary, but I think it is more easily interpreted this way.
+names(bm2.asr.states)[names(bm2.asr.states)==""]<-which(names(bm2.asr.states)=="") # some nodes don't have node numbers, which confuses phenogram() so this is just to make sure they are all numbered nicely
+
+par(mfrow=c(2,2))
+par(mar=c(4,4,1,1))
+phenogram(tree=two_regimes_tree,x=bm2.asr.states, ftype="off", ylim=c(1,120), log="y", colors=cols)
+
+#3 means
+bm3.asr.states<-10^c(amphibia_logC,bm3.asr.estim$estimates)
+names(bm3.asr.states)[names(bm3.asr.states)==""]<-which(names(bm3.asr.states)=="")
+
+par(mar=c(4,4,1,1))
+phenogram(tree=three_regimes_tree,x=bm3.asr.states, ftype="off", ylim=c(1,120), log="y", colors=cols)
+
+## OU
+#2 optima
+ou2.asr.states<-10^c(amphibia_logC,ou2.asr.estim$estimates)
+names(ou2.asr.states)[names(ou2.asr.states)==""]<-which(names(ou2.asr.states)=="")
+
+par(mar=c(4,4,1,1))
+phenogram(tree=two_regimes_tree,x=ou2.asr.states, fsize=0.0001, spread.labels=F, ylim=c(1,120), log="y", colors=cols, ftype="reg")
+
+#3 optima
+ou3.asr.states<-10^c(amphibia_logC,ou3.asr.estim$estimates)
+names(ou3.asr.states)[names(ou3.asr.states)==""]<-which(names(ou3.asr.states)=="")
+
+par(mar=c(4,4,1,1))
+phenogram(tree=three_regimes_tree,x=ou3.asr.states, fsize=0.0001, spread.labels=F, ylim=c(1,120), log="y", colors=cols, ftype="reg")
+
+```
+
+# Simulating traits
+
+Now that we have established the best model(s), we might also want to see whether any species or clades in particular may be outliers, i.e. showing trait histories diverging from the expected. To do this, we can simulate trait histories under the given models to get a distribution of trait values per species.
+
+```{r fig.height = 15, fig.width = 10}
+# Simulate
+simul_bm2<-mvSIM(two_regimes_tree,nsim=10000, model="BMM",param=fit_bm2)
+
+# Find species that fall outside 90% confidence intervals
+simul_bm2.ci<-t(apply(FUN=quantile, c(0.05, 0.95), MARGIN = 1, X = simul_bm2))
+simul_bm2.outliers<-which(simul_bm2.ci[,1] > amphibia_logC | simul_bm2.ci[,2] < amphibia_logC)
+simul_bm2.outliers
+
+# plot expected distributions and true trait values
+par(mfrow=c(4,2))
+for(i in 1:length(simul_bm2.outliers)){
+  hist(simul_bm2[names(simul_bm2.outliers)[i],], main=names(simul_bm2.outliers)[i], cex=0.5, xlab="trait",las=1, border=NA, col="grey80")
+  abline(v=quantile(simul_bm2[names(simul_bm2.outliers)[i],], c(0.05, 0.95)), col="blue", lwd=1, lty=2) # quantile bands
+  abline(v=amphibia_logC[names(simul_bm2.outliers)[i]], col="red", lwd=2) # true value
+}
+```
+
+
+## Simulating ancestral states
+
+I couldn't find a way to get ancestral states for trait simulations (maybe there is a good reason for this), and so my work around has been to just perform ancestral state reconstructions on the simulated states. This seems somewhat circular to me, and so I want to put a big *disclaimer* here that maybe this isn't the best way to go about doing things.
+
+```{r}
+node.sim<-list()
+## NOTE: here i am just using the first 100 simulations, but ideally you would run the loop for 1:ncol(simul_bm2)
+for(i in 1:100){
+  node.sim[[i]]<-estim(two_regimes_tree, simul_bm2[,i], bm2.asr.fit, asr=TRUE)$estimates[,1]
+}
+node.sim<-as.data.frame(t(do.call(rbind, node.sim)))
+
+# Now you have a table of node states for each simulated trait set (simulations as columns)
+# the root note will inevitably be the same for all simulations as this is the nature of a BM model:
+node.sim[1,]
+
+```
+
+
+We could now look at the individual distributions per node if we are interested in a particular one, for example what would be the distribution of traits for the most recent common ancestor of salamanders:
+
+```{r}
+hist(as.numeric(node.sim["488",]), main="Simulated state for Salamander MRCA", xlab=NA, col="grey80", border=NA)
+```
+
+Using the `ggtree` package, we could also plot these histograms directly on the nodes of the tree. To do this, I borrowed a bit of code from (here)[http://www.randigriffin.com/2017/05/11/primate-phylogeny-ggtree.html].
+```{r fig.height = 12, fig.width = 10, warning = F}
+library(ggtree)
+library(ggplot2)
+
+# make ggtee object
+gtree<-ggtree(amphibia.tree)
+
+# define vector with node numbers as character strings for which we want to plot the histograms
+nodes <- c("466","488","657","694")
+
+# make the node annotation object
+pd <- as.data.frame(node.sim[nodes,])
+pdplots <- apply(pd, 1, function(y) {
+  ggplot(data.frame(y=y), aes(y, fill=..x..)) +
+    geom_histogram(binwidth = 0.1, alpha=0.75) +
+    xlim(range(unlist(pd))) +
+    scale_fill_gradient(low = "blue", high = "red") +
+    theme_inset() +
+    theme(axis.line.x = element_line(color="black", size = 0.5),
+          axis.text.x = element_text(size=8))
+})
+
+# plot tree and nodes
+inset(gtree, pdplots, width=0.5, height=0.25, vjust=-1)
+```
+
+
+
