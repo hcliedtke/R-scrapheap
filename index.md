@@ -13,7 +13,7 @@ Who knows... maybe they are useful for other people too!
  
 ## Phylogenetics and Systematics
 
-* Check out [AmphiNom](https://github.com/hcliedtke/AmphiNom), an R package for working with the Amphibian Species of the World database for amphibian systematics. This [tutorial](https://cdn.rawgit.com/hcliedtke/AmphiNom/df576f91/vignettes/AmphiNom_tutorial.html) might help.  
+* Check out [AmphiNom](https://github.com/hcliedtke/AmphiNom), an R package for working with the Amphibian Species of the World database for amphibian systematics. This [example](https://hcliedtke.github.io/R-scrapheap/amphinom_example.html) or [this one](https://hcliedtke.github.io/R-scrapheap/amphinom_tutorial.html) might help.  
 
 * Performing [trait evolution model testing using mvMORPH](./mvMORPH.html)  
 
