@@ -1,7 +1,6 @@
 ---
 layout: default
 ---
-# Welcome to my R Scrapheap
 
 I use R on a daily basis and fairly regularly I run into re-occuring problems. After years of frantically searching through various scripts to see how I solved it last time, I have decided to compile (sometimes) useful bits of code that I might need again. Some of these have been developed into full-fletched R packages or Shiny Apps. Below some of these projects.
 
